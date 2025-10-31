@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, getDocs } from "firebase/firestore";
 import { db, auth } from "./lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 interface User {
   id: string;
@@ -20,6 +20,7 @@ export default function HomePage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [subjectFilter, setSubjectFilter] = useState("All");
   const router = useRouter();
 
   useEffect(() => {
@@ -44,6 +45,61 @@ export default function HomePage() {
     fetchUsers();
   }, []);
 
+  const uniqueSubjects = useMemo(() => {
+    const subjectSet = new Set<string>();
+    users.forEach((user) => {
+      user.subjects?.forEach((subject) => {
+        if (subject) {
+          subjectSet.add(subject.trim());
+        }
+      });
+    });
+    return Array.from(subjectSet).sort((a, b) =>
+      a.localeCompare(b, undefined, { sensitivity: "base" })
+    );
+  }, [users]);
+
+  const filteredUsers = useMemo(() => {
+    if (subjectFilter === "All") {
+      return users;
+    }
+    return users.filter((user) =>
+      user.subjects?.some(
+        (subject) => subject.toLowerCase() === subjectFilter.toLowerCase()
+      )
+    );
+  }, [users, subjectFilter]);
+
+  const tutors = useMemo(
+    () =>
+      filteredUsers.filter(
+        (user) => user.role?.toLowerCase() === "tutor"
+      ),
+    [filteredUsers]
+  );
+
+  const learners = useMemo(
+    () =>
+      filteredUsers.filter(
+        (user) => user.role?.toLowerCase() !== "tutor"
+      ),
+    [filteredUsers]
+  );
+
+  const handleNavigate = (path: string) => {
+    router.push(path);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      setSubjectFilter("All");
+      router.push("/signin");
+    } catch (error) {
+      console.error("Failed to sign out:", error);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-black text-orange-500">
@@ -53,66 +109,187 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen bg-black text-orange-500 p-10">
-      {/* Edit Profile Button */}
-      <div className="flex justify-end mb-6">
-        {currentUser && (
+    <div className="min-h-screen bg-black text-orange-100">
+      <header className="border-b border-orange-700/40 bg-black/70 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
           <button
-            onClick={() => router.push("/Profile")}
-            className="bg-orange-600 hover:bg-orange-700 text-black font-semibold px-5 py-2 rounded-md shadow-md transition"
+            onClick={() => handleNavigate("/")}
+            className="text-left text-2xl font-bold tracking-tight text-orange-400 transition hover:text-orange-300"
           >
-            Edit My Profile
+            Peer Connect
           </button>
-        )}
-      </div>
-
-      <h1 className="text-4xl font-bold text-center mb-10 text-orange-400">
-        Peer Connect Users
-      </h1>
-
-      <div className="grid gap-8 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-        {users.map((user) => (
-          <div
-            key={user.id}
-            className="bg-gray-900 border border-orange-600 rounded-lg p-6 shadow-md hover:shadow-orange-500 transition"
-          >
-            <h2 className="text-2xl font-semibold text-orange-400 mb-3">
-              {user.name || "Unnamed User"}
-            </h2>
-
-            <p className="text-orange-300 mb-2">
-              <span className="font-semibold text-orange-500">Role:</span>{" "}
-              {user.role || "N/A"}
-            </p>
-
-            <p className="text-orange-300 mb-2">
-              <span className="font-semibold text-orange-500">Grade:</span>{" "}
-              {user.grade || "N/A"}
-            </p>
-
-            {user.bio && (
-              <p className="text-orange-400 italic mb-4">
-                “{user.bio}”
-              </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => handleNavigate("/")}
+              className="rounded-full border border-orange-600/60 px-4 py-1 text-sm font-medium text-orange-200 transition hover:border-orange-400 hover:text-orange-100"
+            >
+              Home
+            </button>
+            <button
+              onClick={() => handleNavigate("/Profile")}
+              className="rounded-full border border-orange-600/60 px-4 py-1 text-sm font-medium text-orange-200 transition hover:border-orange-400 hover:text-orange-100"
+            >
+              Profile
+            </button>
+            {!currentUser && (
+              <button
+                onClick={() => handleNavigate("/signin")}
+                className="rounded-full bg-orange-500 px-4 py-1 text-sm font-semibold text-black shadow-lg transition hover:bg-orange-400"
+              >
+                Sign In
+              </button>
             )}
-
-            {user.subjects && user.subjects.length > 0 && (
-              <div className="flex flex-wrap gap-2 mb-4">
-                {user.subjects.map((subject) => (
-                  <span
-                    key={subject}
-                    className="bg-orange-700 text-orange-200 px-3 py-1 rounded-full text-sm font-semibold"
-                  >
-                    {subject}
-                  </span>
-                ))}
-              </div>
+            {currentUser && (
+              <button
+                onClick={handleSignOut}
+                className="rounded-full bg-orange-600 px-4 py-1 text-sm font-semibold text-black shadow-lg transition hover:bg-orange-500"
+              >
+                Sign Out
+              </button>
             )}
-
-            <p className="text-orange-500 text-sm">{user.email}</p>
           </div>
-        ))}
-      </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-6xl px-6 py-12">
+        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h1 className="text-4xl font-bold text-orange-300 sm:text-5xl">
+              Find Peer Tutors & Learners
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm text-orange-200/80">
+              Browse classmates who are ready to help or learn. Use the subject filter to focus on the topics that matter most to you.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2 text-sm text-orange-200/80">
+            <label
+              htmlFor="subject-filter"
+              className="font-semibold text-orange-300"
+            >
+              Filter by subject
+            </label>
+            <select
+              id="subject-filter"
+              value={subjectFilter}
+              onChange={(event) => setSubjectFilter(event.target.value)}
+              className="rounded-lg border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
+            >
+              <option value="All">All subjects</option>
+              {uniqueSubjects.map((subject) => (
+                <option key={subject} value={subject}>
+                  {subject}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="mt-12 grid gap-8 lg:grid-cols-2">
+          <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-6 shadow-[0_30px_60px_-25px_rgba(250,115,22,0.35)]">
+            <header className="mb-6 flex items-center justify-between">
+              <h2 className="text-2xl font-semibold text-orange-300">
+                Tutors
+              </h2>
+              <span className="text-xs uppercase tracking-[0.25em] text-orange-400/70">
+                {tutors.length} available
+              </span>
+            </header>
+            <div className="grid gap-5">
+              {tutors.length > 0 ? (
+                tutors.map((user) => (
+                  <article
+                    key={user.id}
+                    className="rounded-2xl border border-orange-700/40 bg-gray-900/50 p-5 transition hover:border-orange-400 hover:shadow-[0_20px_45px_-30px_rgba(250,115,22,0.75)]"
+                  >
+                    <h3 className="text-xl font-semibold text-orange-200">
+                      {user.name || "Unnamed Tutor"}
+                    </h3>
+                    <p className="mt-1 text-sm text-orange-200/80">
+                      Grade {user.grade || "N/A"}
+                    </p>
+                    {user.bio && (
+                      <p className="mt-3 text-sm italic text-orange-200/70">
+                        “{user.bio}”
+                      </p>
+                    )}
+                    {user.subjects && user.subjects.length > 0 && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {user.subjects.map((subject) => (
+                          <span
+                            key={subject}
+                            className="rounded-full border border-orange-500/50 bg-orange-600/20 px-3 py-1 text-xs font-semibold text-orange-200"
+                          >
+                            {subject}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-4 text-xs text-orange-300">
+                      {user.email}
+                    </p>
+                  </article>
+                ))
+              ) : (
+                <p className="rounded-xl border border-dashed border-orange-500/40 bg-transparent px-4 py-8 text-center text-sm text-orange-200/70">
+                  No tutors match this subject yet. Try another filter or check back soon!
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-6 shadow-[0_30px_60px_-25px_rgba(250,115,22,0.35)]">
+            <header className="mb-6 flex items-center justify-between">
+              <h2 className="text-2xl font-semibold text-orange-300">
+                Students
+              </h2>
+              <span className="text-xs uppercase tracking-[0.25em] text-orange-400/70">
+                {learners.length} looking
+              </span>
+            </header>
+            <div className="grid gap-5">
+              {learners.length > 0 ? (
+                learners.map((user) => (
+                  <article
+                    key={user.id}
+                    className="rounded-2xl border border-orange-700/40 bg-gray-900/50 p-5 transition hover:border-orange-400 hover:shadow-[0_20px_45px_-30px_rgba(250,115,22,0.75)]"
+                  >
+                    <h3 className="text-xl font-semibold text-orange-200">
+                      {user.name || "Unnamed Student"}
+                    </h3>
+                    <p className="mt-1 text-sm text-orange-200/80">
+                      Grade {user.grade || "N/A"}
+                    </p>
+                    {user.bio && (
+                      <p className="mt-3 text-sm italic text-orange-200/70">
+                        “{user.bio}”
+                      </p>
+                    )}
+                    {user.subjects && user.subjects.length > 0 && (
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {user.subjects.map((subject) => (
+                          <span
+                            key={subject}
+                            className="rounded-full border border-orange-500/50 bg-orange-600/20 px-3 py-1 text-xs font-semibold text-orange-200"
+                          >
+                            {subject}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-4 text-xs text-orange-300">
+                      {user.email}
+                    </p>
+                  </article>
+                ))
+              ) : (
+                <p className="rounded-xl border border-dashed border-orange-500/40 bg-transparent px-4 py-8 text-center text-sm text-orange-200/70">
+                  No students match this subject right now. Invite classmates to join Peer Connect!
+                </p>
+              )}
+            </div>
+          </section>
+        </div>
+      </main>
     </div>
   );
 }

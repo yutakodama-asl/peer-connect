@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { db, auth } from "../lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { onAuthStateChanged, signOut, type User as FirebaseUser } from "firebase/auth";
 
 const ProfilePage = () => {
   const [userData, setUserData] = useState({
@@ -18,16 +19,24 @@ const ProfilePage = () => {
   const [error, setError] = useState<string | null>(null);
 
   const router = useRouter();
-  const user = auth.currentUser;
+  const [authUser, setAuthUser] = useState<FirebaseUser | null>(() => auth.currentUser);
 
   useEffect(() => {
-    if (!user) {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setAuthUser(user);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (!authUser) {
       setLoading(false);
       return;
     }
+
     const fetchUserData = async () => {
       try {
-        const docRef = doc(db, "users", user.uid);
+        const docRef = doc(db, "users", authUser.uid);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -38,6 +47,12 @@ const ProfilePage = () => {
             subjects: data.subjects ? data.subjects.join(", ") : "",
             bio: data.bio || "",
           });
+        } else {
+          setUserData((prev) => ({
+            ...prev,
+            name: authUser.displayName || "",
+            subjects: "",
+          }));
         }
       } catch (e) {
         setError("Failed to load profile data.");
@@ -45,8 +60,10 @@ const ProfilePage = () => {
         setLoading(false);
       }
     };
+
+    setLoading(true);
     fetchUserData();
-  }, [user]);
+  }, [authUser]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -57,110 +74,219 @@ const ProfilePage = () => {
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!authUser) {
+      router.push("/signin");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      const docRef = doc(db, "users", user.uid);
+      const docRef = doc(db, "users", authUser.uid);
+      const normalizedSubjects = Array.from(
+        new Set(
+          userData.subjects
+            .split(",")
+            .map((subject) => subject.trim())
+            .filter(Boolean)
+        )
+      );
       await setDoc(docRef, {
         name: userData.name,
         grade: userData.grade,
         role: userData.role,
-        subjects: userData.subjects.split(",").map((s) => s.trim()).filter(Boolean),
+        subjects: normalizedSubjects,
         bio: userData.bio,
       }, { merge: true });
       router.push("/");
     } catch (e) {
+      console.error("Failed to save profile:", e);
       setError("Failed to save changes.");
     } finally {
       setSaving(false);
     }
   };
 
-  if (!user) {
-    return (
-      <div className="max-w-xl mx-auto p-6 mt-12 bg-black text-orange-500 rounded-lg shadow-lg">
-        <h2 className="text-2xl font-semibold mb-4">Profile</h2>
-        <p>Please log in to view and edit your profile.</p>
-      </div>
-    );
-  }
+  const handleNavigate = (path: string) => {
+    router.push(path);
+  };
 
-  if (loading) {
-    return (
-      <div className="max-w-xl mx-auto p-6 mt-12 bg-black text-orange-500 rounded-lg shadow-lg">
-        <h2 className="text-2xl font-semibold mb-4">Profile</h2>
-        <p>Loading...</p>
-      </div>
-    );
-  }
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      router.push("/signin");
+    } catch (err) {
+      console.error("Failed to sign out:", err);
+    }
+  };
 
   return (
-    <div className="max-w-xl mx-auto p-6 mt-12 bg-black text-orange-500 rounded-lg shadow-lg">
-      <h2 className="text-3xl font-bold mb-6 border-b border-orange-600 pb-2">Your Profile</h2>
-      {error && <p className="mb-4 text-red-500">{error}</p>}
-      <label className="block mb-4">
-        <span className="block mb-1 font-semibold">Name</span>
-        <input
-          type="text"
-          name="name"
-          value={userData.name}
-          onChange={handleChange}
-          className="w-full rounded border border-orange-600 bg-black px-3 py-2 text-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
-        />
-      </label>
-      <label className="block mb-4">
-        <span className="block mb-1 font-semibold">Grade</span>
-        <input
-          type="text"
-          name="grade"
-          value={userData.grade}
-          onChange={handleChange}
-          className="w-full rounded border border-orange-600 bg-black px-3 py-2 text-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
-          placeholder="e.g. 10th, 11th"
-        />
-      </label>
-      <label className="block mb-4">
-        <span className="block mb-1 font-semibold">Role</span>
-        <select
-          name="role"
-          value={userData.role}
-          onChange={handleChange}
-          className="w-full rounded border border-orange-600 bg-black px-3 py-2 text-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
-        >
-          <option value="tutor">Tutor</option>
-          <option value="learner">Learner</option>
-        </select>
-      </label>
-      <label className="block mb-4">
-        <span className="block mb-1 font-semibold">Subjects (comma-separated)</span>
-        <input
-          type="text"
-          name="subjects"
-          value={userData.subjects}
-          onChange={handleChange}
-          className="w-full rounded border border-orange-600 bg-black px-3 py-2 text-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
-          placeholder="e.g. Math, Physics, Chemistry"
-        />
-      </label>
-      <label className="block mb-6">
-        <span className="block mb-1 font-semibold">Bio</span>
-        <textarea
-          name="bio"
-          value={userData.bio}
-          onChange={handleChange}
-          rows={4}
-          className="w-full rounded border border-orange-600 bg-black px-3 py-2 text-orange-300 focus:outline-none focus:ring-2 focus:ring-orange-500"
-          placeholder="Tell us about yourself"
-        />
-      </label>
-      <button
-        onClick={handleSave}
-        disabled={saving}
-        className="bg-orange-600 hover:bg-orange-700 text-black font-semibold px-6 py-3 rounded transition-colors disabled:opacity-50"
-      >
-        {saving ? "Saving..." : "Save Changes"}
-      </button>
+    <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-gray-900 text-orange-100">
+      <header className="border-b border-orange-700/40 bg-black/70 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-5">
+          <button
+            onClick={() => handleNavigate("/")}
+            className="text-left text-2xl font-bold tracking-tight text-orange-400 transition hover:text-orange-300"
+          >
+            Peer Connect
+          </button>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              onClick={() => handleNavigate("/")}
+              className="rounded-full border border-orange-600/60 px-4 py-1 text-sm font-medium text-orange-200 transition hover:border-orange-400 hover:text-orange-100"
+            >
+              Home
+            </button>
+            <button
+              onClick={() => handleNavigate("/Profile")}
+              className="rounded-full border border-orange-600/60 px-4 py-1 text-sm font-medium text-orange-200 transition hover:border-orange-400 hover:text-orange-100"
+            >
+              Profile
+            </button>
+            {!authUser ? (
+              <button
+                onClick={() => handleNavigate("/signin")}
+                className="rounded-full bg-orange-500 px-4 py-1 text-sm font-semibold text-black shadow-lg transition hover:bg-orange-400"
+              >
+                Sign In
+              </button>
+            ) : (
+              <button
+                onClick={handleSignOut}
+                className="rounded-full bg-orange-600 px-4 py-1 text-sm font-semibold text-black shadow-lg transition hover:bg-orange-500"
+              >
+                Sign Out
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto max-w-5xl px-6 py-12">
+        {!authUser ? (
+          <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-10 text-center shadow-[0_25px_70px_-30px_rgba(250,115,22,0.45)]">
+            <h1 className="text-3xl font-semibold text-orange-200">
+              Sign in to keep your profile up to date
+            </h1>
+            <p className="mt-3 text-sm text-orange-200/70">
+              Jump back into the directory by using your school email.
+            </p>
+            <div className="mt-8 flex justify-center">
+              <button
+                onClick={() => handleNavigate("/signin")}
+                className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-black shadow-lg transition hover:bg-orange-400"
+              >
+                Go to sign in
+              </button>
+            </div>
+          </section>
+        ) : loading ? (
+          <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-10 text-center shadow-[0_25px_70px_-30px_rgba(250,115,22,0.45)]">
+            <h1 className="text-3xl font-semibold text-orange-200">
+              Loading your profile
+            </h1>
+            <p className="mt-3 text-sm text-orange-200/70">
+              We&apos;re fetching your saved details. This only takes a moment.
+            </p>
+          </section>
+        ) : (
+          <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-10 shadow-[0_25px_70px_-30px_rgba(250,115,22,0.45)]">
+            <div className="flex flex-col gap-4 border-b border-orange-700/40 pb-6">
+              <h1 className="text-4xl font-bold text-orange-200">Your Profile</h1>
+              <p className="max-w-2xl text-sm text-orange-200/70">
+                Share a quick snapshot of who you are so tutors and learners can find the perfect match.
+              </p>
+            </div>
+
+            {error && (
+              <p className="mt-4 rounded-lg border border-red-500/40 bg-red-950/60 px-4 py-2 text-sm text-red-300">
+                {error}
+              </p>
+            )}
+
+            <div className="mt-6 grid gap-5 md:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-orange-200">Name</span>
+                <input
+                  type="text"
+                  name="name"
+                  value={userData.name}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Your full name"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-orange-200">Grade</span>
+                <input
+                  type="text"
+                  name="grade"
+                  value={userData.grade}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="e.g. 10th, 11th"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-orange-200">Role</span>
+                <select
+                  name="role"
+                  value={userData.role}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                >
+                  <option value="tutor">Tutor</option>
+                  <option value="learner">Learner</option>
+                </select>
+              </label>
+
+              <label className="flex flex-col gap-2 md:col-span-2">
+                <span className="text-sm font-semibold text-orange-200">Subjects</span>
+                <input
+                  type="text"
+                  name="subjects"
+                  value={userData.subjects}
+                  onChange={handleChange}
+                  className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Comma separated e.g. Math, Physics"
+                />
+                <span className="text-xs text-orange-200/60">
+                  Tip: Add multiple subjects by separating them with commas.
+                </span>
+              </label>
+            </div>
+
+            <label className="mt-6 flex flex-col gap-2">
+              <span className="text-sm font-semibold text-orange-200">Bio</span>
+              <textarea
+                name="bio"
+                value={userData.bio}
+                onChange={handleChange}
+                rows={5}
+                className="w-full rounded-xl border border-orange-600 bg-black px-3 py-3 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                placeholder="Tell the community how you like to study or how you help others."
+              />
+            </label>
+
+            <div className="mt-8 flex flex-wrap items-center gap-4">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-black shadow-lg transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {saving ? "Saving..." : "Save changes"}
+              </button>
+              <button
+                onClick={() => handleNavigate("/")}
+                className="rounded-full border border-orange-600/70 px-6 py-3 text-sm font-medium text-orange-200 transition hover:border-orange-400 hover:text-orange-100"
+              >
+                Back to directory
+              </button>
+            </div>
+          </section>
+        )}
+      </main>
     </div>
   );
 };
