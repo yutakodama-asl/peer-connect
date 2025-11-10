@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, getDocs } from "firebase/firestore";
 import { db, auth } from "./lib/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut, type User as FirebaseAuthUser } from "firebase/auth";
 
 interface User {
   id: string;
@@ -14,13 +14,69 @@ interface User {
   role?: string;
   subjects?: string[];
   bio?: string;
+  tutorSubjects?: string[];
+  learnerSubjects?: string[];
+  tutorBio?: string;
+  learnerBio?: string;
 }
+
+const normalizeSubjects = (subjects?: string[]) =>
+  (subjects ?? [])
+    .map((subject) => (typeof subject === "string" ? subject.trim() : ""))
+    .filter((subject) => subject.length > 0);
+
+const getTutorSubjects = (user: User): string[] => {
+  const tutorSubjects = normalizeSubjects(user.tutorSubjects);
+  if (tutorSubjects.length > 0) {
+    return tutorSubjects;
+  }
+  const roleValue = user.role?.toLowerCase();
+  if (roleValue === "tutor" || roleValue === "both") {
+    return normalizeSubjects(user.subjects);
+  }
+  return [];
+};
+
+const getLearnerSubjects = (user: User): string[] => {
+  const learnerSubjects = normalizeSubjects(user.learnerSubjects);
+  if (learnerSubjects.length > 0) {
+    return learnerSubjects;
+  }
+  const roleValue = user.role?.toLowerCase();
+  if (!roleValue || roleValue === "learner" || roleValue === "both") {
+    return normalizeSubjects(user.subjects);
+  }
+  return [];
+};
+
+const getTutorBio = (user: User): string | undefined => {
+  if (user.tutorBio && user.tutorBio.trim()) {
+    return user.tutorBio;
+  }
+  const roleValue = user.role?.toLowerCase();
+  if (roleValue === "tutor" || roleValue === "both") {
+    return user.bio;
+  }
+  return undefined;
+};
+
+const getLearnerBio = (user: User): string | undefined => {
+  if (user.learnerBio && user.learnerBio.trim()) {
+    return user.learnerBio;
+  }
+  const roleValue = user.role?.toLowerCase();
+  if (!roleValue || roleValue === "learner" || roleValue === "both") {
+    return user.bio;
+  }
+  return undefined;
+};
 
 export default function HomePage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
-  const [subjectFilter, setSubjectFilter] = useState("All");
+  const [currentUser, setCurrentUser] = useState<FirebaseAuthUser | null>(null);
+  const [showAllTutors, setShowAllTutors] = useState(false);
+  const [showAllLearners, setShowAllLearners] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -45,46 +101,82 @@ export default function HomePage() {
     fetchUsers();
   }, []);
 
-  const uniqueSubjects = useMemo(() => {
-    const subjectSet = new Set<string>();
-    users.forEach((user) => {
-      user.subjects?.forEach((subject) => {
-        if (subject) {
-          subjectSet.add(subject.trim());
-        }
-      });
-    });
-    return Array.from(subjectSet).sort((a, b) =>
-      a.localeCompare(b, undefined, { sensitivity: "base" })
-    );
-  }, [users]);
+  const viewerProfile = useMemo(
+    () => (currentUser ? users.find((user) => user.id === currentUser.uid) ?? null : null),
+    [users, currentUser]
+  );
 
-  const filteredUsers = useMemo(() => {
-    if (subjectFilter === "All") {
-      return users;
+  const viewerLearnerSubjects = useMemo(
+    () => (viewerProfile ? getLearnerSubjects(viewerProfile) : []),
+    [viewerProfile]
+  );
+
+  const viewerTutorSubjects = useMemo(
+    () => (viewerProfile ? getTutorSubjects(viewerProfile) : []),
+    [viewerProfile]
+  );
+
+  const viewerLearnerSubjectSet = useMemo(
+    () => new Set<string>(viewerLearnerSubjects.map((subject) => subject.toLowerCase())),
+    [viewerLearnerSubjects]
+  );
+
+  const viewerTutorSubjectSet = useMemo(
+    () => new Set<string>(viewerTutorSubjects.map((subject) => subject.toLowerCase())),
+    [viewerTutorSubjects]
+  );
+
+  const hasViewerLearnerSubjects = viewerLearnerSubjects.length > 0;
+  const hasViewerTutorSubjects = viewerTutorSubjects.length > 0;
+  const tutors = useMemo(() => {
+    if (!currentUser) {
+      return [];
     }
-    return users.filter((user) =>
-      user.subjects?.some(
-        (subject) => subject.toLowerCase() === subjectFilter.toLowerCase()
-      )
-    );
-  }, [users, subjectFilter]);
+    if (!showAllTutors && !hasViewerLearnerSubjects) {
+      return [];
+    }
+    return users.filter((user) => {
+      if (user.id === currentUser.uid) {
+        return false;
+      }
+      const tutorSubjects = getTutorSubjects(user);
+      if (tutorSubjects.length === 0) {
+        return showAllTutors;
+      }
+      if (showAllTutors) {
+        return true;
+      }
+      const tutorSubjectsLower = tutorSubjects.map((subject) => subject.toLowerCase());
+      return tutorSubjectsLower.some((subject) =>
+        viewerLearnerSubjectSet.has(subject)
+      );
+    });
+  }, [users, currentUser, showAllTutors, hasViewerLearnerSubjects, viewerLearnerSubjectSet]);
 
-  const tutors = useMemo(
-    () =>
-      filteredUsers.filter(
-        (user) => user.role?.toLowerCase() === "tutor"
-      ),
-    [filteredUsers]
-  );
-
-  const learners = useMemo(
-    () =>
-      filteredUsers.filter(
-        (user) => user.role?.toLowerCase() !== "tutor"
-      ),
-    [filteredUsers]
-  );
+  const learners = useMemo(() => {
+    if (!currentUser) {
+      return [];
+    }
+    if (!showAllLearners && !hasViewerTutorSubjects) {
+      return [];
+    }
+    return users.filter((user) => {
+      if (user.id === currentUser.uid) {
+        return false;
+      }
+      const learnerSubjects = getLearnerSubjects(user);
+      if (learnerSubjects.length === 0) {
+        return showAllLearners;
+      }
+      if (showAllLearners) {
+        return true;
+      }
+      const learnerSubjectsLower = learnerSubjects.map((subject) => subject.toLowerCase());
+      return learnerSubjectsLower.some((subject) =>
+        viewerTutorSubjectSet.has(subject)
+      );
+    });
+  }, [users, currentUser, showAllLearners, hasViewerTutorSubjects, viewerTutorSubjectSet]);
 
   const handleNavigate = (path: string) => {
     router.push(path);
@@ -93,7 +185,8 @@ export default function HomePage() {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      setSubjectFilter("All");
+      setShowAllTutors(false);
+      setShowAllLearners(false);
       router.push("/signin");
     } catch (error) {
       console.error("Failed to sign out:", error);
@@ -152,87 +245,97 @@ export default function HomePage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-12">
-        <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <h1 className="text-4xl font-bold text-orange-300 sm:text-5xl">
-              Find Peer Tutors & Learners
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm text-orange-200/80">
-              Browse classmates who are ready to help or learn. Use the subject filter to focus on the topics that matter most to you.
-            </p>
-          </div>
-          <div className="flex flex-col gap-2 text-sm text-orange-200/80">
-            <label
-              htmlFor="subject-filter"
-              className="font-semibold text-orange-300"
-            >
-              Filter by subject
-            </label>
-            <select
-              id="subject-filter"
-              value={subjectFilter}
-              onChange={(event) => setSubjectFilter(event.target.value)}
-              className="rounded-lg border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
-            >
-              <option value="All">All subjects</option>
-              {uniqueSubjects.map((subject) => (
-                <option key={subject} value={subject}>
-                  {subject}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div>
+          <h1 className="text-4xl font-bold text-orange-300 sm:text-5xl">
+            Find Peer Tutors & Learners
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm text-orange-200/80">
+            Browse classmates who are ready to help or learn. By default you&apos;ll see people whose subjects align with yours—use the “Show all” buttons if you want to browse the full directory.
+          </p>
         </div>
 
         <div className="mt-12 grid gap-8 lg:grid-cols-2">
           <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-6 shadow-[0_30px_60px_-25px_rgba(250,115,22,0.35)]">
             <header className="mb-6 flex items-center justify-between">
               <h2 className="text-2xl font-semibold text-orange-300">
-                Tutors
+                Tutor Matches
               </h2>
               <span className="text-xs uppercase tracking-[0.25em] text-orange-400/70">
-                {tutors.length} available
+                {tutors.length} matches
               </span>
             </header>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-orange-200/70 sm:text-sm">
+              <span>
+                {showAllTutors
+                  ? "Showing every tutor in the directory."
+                  : "Showing tutors who cover the subjects you're learning."}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAllTutors((prev) => !prev)}
+                className="rounded-full border border-orange-600/60 px-3 py-1 text-xs font-semibold text-orange-200 transition hover:border-orange-300 hover:text-orange-100 sm:text-sm"
+              >
+                {showAllTutors ? "Show matches only" : "Show all"}
+              </button>
+            </div>
             <div className="grid gap-5">
               {tutors.length > 0 ? (
-                tutors.map((user) => (
-                  <article
-                    key={user.id}
-                    className="rounded-2xl border border-orange-700/40 bg-gray-900/50 p-5 transition hover:border-orange-400 hover:shadow-[0_20px_45px_-30px_rgba(250,115,22,0.75)]"
-                  >
-                    <h3 className="text-xl font-semibold text-orange-200">
-                      {user.name || "Unnamed Tutor"}
-                    </h3>
-                    <p className="mt-1 text-sm text-orange-200/80">
-                      Grade {user.grade || "N/A"}
-                    </p>
-                    {user.bio && (
-                      <p className="mt-3 text-sm italic text-orange-200/70">
-                        “{user.bio}”
+                tutors.map((user) => {
+                  const tutorBio = getTutorBio(user);
+                  const tutorSubjects = getTutorSubjects(user);
+
+                  return (
+                    <article
+                      key={user.id}
+                      className="rounded-2xl border border-orange-700/40 bg-gray-900/50 p-5 transition hover:border-orange-400 hover:shadow-[0_20px_45px_-30px_rgba(250,115,22,0.75)]"
+                    >
+                      <h3 className="text-xl font-semibold text-orange-200">
+                        {user.name || "Unnamed Tutor"}
+                      </h3>
+                      <p className="mt-1 text-sm text-orange-200/80">
+                        Grade {user.grade || "N/A"}
                       </p>
-                    )}
-                    {user.subjects && user.subjects.length > 0 && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {user.subjects.map((subject) => (
-                          <span
-                            key={subject}
-                            className="rounded-full border border-orange-500/50 bg-orange-600/20 px-3 py-1 text-xs font-semibold text-orange-200"
-                          >
-                            {subject}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <p className="mt-4 text-xs text-orange-300">
-                      {user.email}
-                    </p>
-                  </article>
-                ))
+                      {tutorBio && (
+                        <p className="mt-3 text-sm italic text-orange-200/70">
+                          “{tutorBio}”
+                        </p>
+                      )}
+                      {tutorSubjects.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {tutorSubjects.map((subject) => (
+                            <span
+                              key={subject}
+                              className="rounded-full border border-orange-500/50 bg-orange-600/20 px-3 py-1 text-xs font-semibold text-orange-200"
+                            >
+                              {subject}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="mt-4 text-xs text-orange-300">
+                        {user.email}
+                      </p>
+                    </article>
+                  );
+                })
               ) : (
-                <p className="rounded-xl border border-dashed border-orange-500/40 bg-transparent px-4 py-8 text-center text-sm text-orange-200/70">
-                  No tutors match this subject yet. Try another filter or check back soon!
-                </p>
+                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-orange-500/40 bg-transparent px-4 py-8 text-center text-sm text-orange-200/70">
+                  <p>
+                    {!currentUser
+                      ? "Sign in and add the classes you're learning to see matching tutors."
+                      : !hasViewerLearnerSubjects && !showAllTutors
+                        ? "Add the classes you're learning in your profile to see matching tutors."
+                        : "No tutors are available just yet. Check back soon!"
+                    }
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate("/Profile")}
+                    className="rounded-full border border-orange-500/60 px-4 py-2 text-xs font-semibold text-orange-200 transition hover:border-orange-300 hover:text-orange-100"
+                  >
+                    Go to profile
+                  </button>
+                </div>
               )}
             </div>
           </section>
@@ -240,51 +343,84 @@ export default function HomePage() {
           <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-6 shadow-[0_30px_60px_-25px_rgba(250,115,22,0.35)]">
             <header className="mb-6 flex items-center justify-between">
               <h2 className="text-2xl font-semibold text-orange-300">
-                Students
+                Learner Matches
               </h2>
               <span className="text-xs uppercase tracking-[0.25em] text-orange-400/70">
-                {learners.length} looking
+                {learners.length} matches
               </span>
             </header>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs text-orange-200/70 sm:text-sm">
+              <span>
+                {showAllLearners
+                  ? "Showing every learner in the directory."
+                  : "Showing learners who need help with the subjects you teach."}
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowAllLearners((prev) => !prev)}
+                className="rounded-full border border-orange-600/60 px-3 py-1 text-xs font-semibold text-orange-200 transition hover:border-orange-300 hover:text-orange-100 sm:text-sm"
+              >
+                {showAllLearners ? "Show matches only" : "Show all"}
+              </button>
+            </div>
             <div className="grid gap-5">
               {learners.length > 0 ? (
-                learners.map((user) => (
-                  <article
-                    key={user.id}
-                    className="rounded-2xl border border-orange-700/40 bg-gray-900/50 p-5 transition hover:border-orange-400 hover:shadow-[0_20px_45px_-30px_rgba(250,115,22,0.75)]"
-                  >
-                    <h3 className="text-xl font-semibold text-orange-200">
-                      {user.name || "Unnamed Student"}
-                    </h3>
-                    <p className="mt-1 text-sm text-orange-200/80">
-                      Grade {user.grade || "N/A"}
-                    </p>
-                    {user.bio && (
-                      <p className="mt-3 text-sm italic text-orange-200/70">
-                        “{user.bio}”
+                learners.map((user) => {
+                  const learnerBio = getLearnerBio(user);
+                  const learnerSubjects = getLearnerSubjects(user);
+
+                  return (
+                    <article
+                      key={user.id}
+                      className="rounded-2xl border border-orange-700/40 bg-gray-900/50 p-5 transition hover:border-orange-400 hover:shadow-[0_20px_45px_-30px_rgba(250,115,22,0.75)]"
+                    >
+                      <h3 className="text-xl font-semibold text-orange-200">
+                        {user.name || "Unnamed Student"}
+                      </h3>
+                      <p className="mt-1 text-sm text-orange-200/80">
+                        Grade {user.grade || "N/A"}
                       </p>
-                    )}
-                    {user.subjects && user.subjects.length > 0 && (
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        {user.subjects.map((subject) => (
-                          <span
-                            key={subject}
-                            className="rounded-full border border-orange-500/50 bg-orange-600/20 px-3 py-1 text-xs font-semibold text-orange-200"
-                          >
-                            {subject}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <p className="mt-4 text-xs text-orange-300">
-                      {user.email}
-                    </p>
-                  </article>
-                ))
+                      {learnerBio && (
+                        <p className="mt-3 text-sm italic text-orange-200/70">
+                          “{learnerBio}”
+                        </p>
+                      )}
+                      {learnerSubjects.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {learnerSubjects.map((subject) => (
+                            <span
+                              key={subject}
+                              className="rounded-full border border-orange-500/50 bg-orange-600/20 px-3 py-1 text-xs font-semibold text-orange-200"
+                            >
+                              {subject}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <p className="mt-4 text-xs text-orange-300">
+                        {user.email}
+                      </p>
+                    </article>
+                  );
+                })
               ) : (
-                <p className="rounded-xl border border-dashed border-orange-500/40 bg-transparent px-4 py-8 text-center text-sm text-orange-200/70">
-                  No students match this subject right now. Invite classmates to join Peer Connect!
-                </p>
+                <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-orange-500/40 bg-transparent px-4 py-8 text-center text-sm text-orange-200/70">
+                  <p>
+                    {!currentUser
+                      ? "Sign in and add the classes you can teach to see students who need your help."
+                      : !hasViewerTutorSubjects && !showAllLearners
+                        ? "Add the classes you can teach in your profile to see learners who need support."
+                        : "No learners are looking for help just yet. Check back soon!"
+                    }
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleNavigate("/Profile")}
+                    className="rounded-full border border-orange-500/60 px-4 py-2 text-xs font-semibold text-orange-200 transition hover:border-orange-300 hover:text-orange-100"
+                  >
+                    Go to profile
+                  </button>
+                </div>
               )}
             </div>
           </section>

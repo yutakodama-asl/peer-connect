@@ -1,15 +1,22 @@
 'use client';
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { db, auth } from "./../lib/firebase";
-import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
+import {
+  GoogleAuthProvider,
+  signInWithPopup,
+  onAuthStateChanged,
+  signOut,
+  type User as FirebaseAuthUser,
+} from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
 export default function SignInPage() {
   const [error, setError] = useState("");
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [currentUser, setCurrentUser] = useState<FirebaseAuthUser | null>(null);
   const router = useRouter();
 
   // 👇 Only redirect if already logged in *and* domain is valid
@@ -79,9 +86,9 @@ export default function SignInPage() {
       }
 
       router.push("/");
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Sign in error:", err);
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "Failed to sign in with Google.");
     }
   };
 
@@ -91,9 +98,17 @@ export default function SignInPage() {
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-5">
           <button
             onClick={() => handleNavigate("/")}
-            className="text-left text-2xl font-bold tracking-tight text-orange-400 transition hover:text-orange-300"
+            className="flex items-center transition hover:opacity-90"
+            aria-label="Peer Connect home"
           >
-            Peer Connect
+            <Image
+              src="/logo.svg"
+              alt="Peer Connect"
+              width={160}
+              height={36}
+              priority
+              className="h-10 w-auto"
+            />
           </button>
           <div className="flex flex-wrap items-center gap-3">
             <button
@@ -181,8 +196,15 @@ export default function SignInPage() {
                   onClick={handleGoogleSignIn}
                   className="group flex items-center justify-center gap-3 rounded-xl border border-orange-500/60 bg-gradient-to-r from-orange-600 via-orange-500 to-orange-600 px-6 py-3 text-base font-semibold text-black shadow-lg transition hover:shadow-orange-500/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-400"
                 >
-                  <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-orange-900/30 bg-black/20 p-2 transition group-hover:border-black/0">
-                    <img src="/google.svg" alt="Google logo" className="h-5 w-5" />
+                  <span className="flex h-10 w-10 items-center justify-center rounded-lg border border-orange-900/30 bg-black p-2 transition group-hover:border-black/0">
+                    <Image
+                      src="/google.svg"
+                      alt="Google logo"
+                      width={20}
+                      height={20}
+                      priority
+                      className="h-5 w-5"
+                    />
                   </span>
                   Continue with Google
                 </button>
