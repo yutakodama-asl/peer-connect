@@ -84,6 +84,7 @@ export default function HomePage() {
   const [currentUser, setCurrentUser] = useState<FirebaseAuthUser | null>(null);
   const [showAllTutors, setShowAllTutors] = useState(false);
   const [showAllLearners, setShowAllLearners] = useState(false);
+  const [tab, setTab] = useState<"tutors" | "learners">("tutors");
   const router = useRouter();
 
   useEffect(() => {
@@ -264,6 +265,30 @@ export default function HomePage() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 py-12">
+        <div className="flex justify-center gap-4 mb-10">
+          <button
+            type="button"
+            onClick={() => setTab("tutors")}
+            className={`px-5 py-2 rounded-full text-sm font-semibold border transition ${
+              tab === "tutors"
+                ? "bg-orange-500 text-black border-orange-400"
+                : "bg-black text-orange-300 border-orange-700/50 hover:border-orange-400 hover:text-orange-100"
+            }`}
+          >
+            Tutors
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("learners")}
+            className={`px-5 py-2 rounded-full text-sm font-semibold border transition ${
+              tab === "learners"
+                ? "bg-orange-500 text-black border-orange-400"
+                : "bg-black text-orange-300 border-orange-700/50 hover:border-orange-400 hover:text-orange-100"
+            }`}
+          >
+            Learners
+          </button>
+        </div>
         <div>
           <h1 className="text-4xl font-bold text-orange-300 sm:text-5xl">
             Find Peer Tutors & Learners
@@ -273,7 +298,8 @@ export default function HomePage() {
           </p>
         </div>
 
-        <div className="mt-12 grid gap-8 lg:grid-cols-2">
+        <div className="mt-12">
+          {tab === "tutors" && (
           <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-6 shadow-[0_30px_60px_-25px_rgba(250,115,22,0.35)]">
             <header className="mb-6 flex items-center justify-between">
               <h2 className="text-2xl font-semibold text-orange-300">
@@ -377,7 +403,9 @@ export default function HomePage() {
               )}
             </div>
           </section>
+          )}
 
+          {tab === "learners" && (
           <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-6 shadow-[0_30px_60px_-25px_rgba(250,115,22,0.35)]">
             <header className="mb-6 flex items-center justify-between">
               <h2 className="text-2xl font-semibold text-orange-300">
@@ -481,6 +509,7 @@ export default function HomePage() {
               )}
             </div>
           </section>
+          )}
         </div>
       </main>
     </div>
