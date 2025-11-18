@@ -37,7 +37,7 @@ export default function ContactPage() {
             onClick={() => window.location.href = `mailto:${profile.gmail}`}
             className="flex items-center gap-3 rounded-xl bg-orange-500/20 border border-orange-600 px-4 py-2 hover:bg-orange-500/30 transition text-left"
           >
-            <span className="text-lg">📧</span>
+            <span className="text-lg"></span>
             <div>
               <p className="font-semibold text-orange-300">Email</p>
               <p className="text-orange-200/70 text-sm">{profile.gmail}</p>
@@ -53,7 +53,7 @@ export default function ContactPage() {
             rel="noopener noreferrer"
             className="flex items-center gap-3 rounded-xl bg-orange-500/20 border border-orange-600 px-4 py-2 hover:bg-orange-500/30 transition"
           >
-            <span className="text-lg">👻</span>
+            <span className="text-lg"></span>
             <div>
               <p className="font-semibold text-orange-300">Snapchat</p>
               <p className="text-orange-200/70 text-sm">@{profile.snapchat}</p>
@@ -69,7 +69,7 @@ export default function ContactPage() {
             rel="noopener noreferrer"
             className="flex items-center gap-3 rounded-xl bg-orange-500/20 border border-orange-600 px-4 py-2 hover:bg-orange-500/30 transition"
           >
-            <span className="text-lg">📸</span>
+            <span className="text-lg"></span>
             <div>
               <p className="font-semibold text-orange-300">Instagram</p>
               <p className="text-orange-200/70 text-sm">@{profile.instagram}</p>
