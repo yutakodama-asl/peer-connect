@@ -25,6 +25,8 @@ const toSubjectArray = (value: unknown): string[] => {
   return [];
 };
 
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
 const ProfilePage = () => {
   const [userData, setUserData] = useState({
     name: "",
@@ -33,6 +35,10 @@ const ProfilePage = () => {
     tutorBio: "",
     learnerSubjects: [] as string[],
     learnerBio: "",
+    availableDays: [] as string[],
+    gmail: "",
+    snapchat: "",
+    instagram: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -105,6 +111,12 @@ const ProfilePage = () => {
             tutorBio,
             learnerSubjects,
             learnerBio,
+            availableDays: Array.isArray(data.availableDays)
+              ? data.availableDays.filter((d: unknown) => typeof d === "string")
+              : [],
+            gmail: typeof data.gmail === "string" ? data.gmail : "",
+            snapchat: typeof data.snapchat === "string" ? data.snapchat : "",
+            instagram: typeof data.instagram === "string" ? data.instagram : "",
           });
 
         } else {
@@ -218,6 +230,10 @@ const ProfilePage = () => {
         tutorBio,
         learnerBio,
         bio: tutorBio || learnerBio,
+        availableDays: userData.availableDays,
+        gmail: userData.gmail?.trim() || "",
+        snapchat: userData.snapchat?.trim() || "",
+        instagram: userData.instagram?.trim() || "",
       }, { merge: true });
       router.push("/");
     } catch (e) {
@@ -226,6 +242,20 @@ const ProfilePage = () => {
     } finally {
       setSaving(false);
     }
+  };
+  const toggleAvailableDay = (day: string) => {
+    setUserData((prev) => {
+      const current = new Set(prev.availableDays);
+      if (current.has(day)) {
+        current.delete(day);
+      } else {
+        current.add(day);
+      }
+      return {
+        ...prev,
+        availableDays: Array.from(current),
+      };
+    });
   };
 
   const handleNavigate = (path: string) => {
@@ -531,6 +561,68 @@ const ProfilePage = () => {
                     rows={5}
                     className="w-full rounded-xl border border-orange-600 bg-black px-3 py-3 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
                     placeholder="Share how you like to learn or what kind of support you need."
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Days of the week availability */}
+            <div className="mt-8">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-orange-200">
+                  When are you available for sessions?
+                </span>
+                <div className="flex flex-wrap gap-4 mt-2">
+                  {DAYS.map((day) => (
+                    <label key={day} className="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={userData.availableDays.includes(day)}
+                        onChange={() => toggleAvailableDay(day)}
+                        className="form-checkbox accent-orange-500 h-4 w-4 rounded border-orange-600 bg-black"
+                      />
+                      <span className="text-orange-200 text-sm">{day}</span>
+                    </label>
+                  ))}
+                </div>
+              </label>
+            </div>
+
+            {/* Contact Information */}
+            <div className="mt-8 rounded-2xl border border-orange-700/40 bg-gray-950/40 p-5">
+              <h2 className="text-xl font-semibold text-orange-200 mb-2">Contact Information</h2>
+              <div className="grid gap-5 md:grid-cols-3">
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-semibold text-orange-200">Gmail</span>
+                  <input
+                    type="email"
+                    name="gmail"
+                    value={userData.gmail}
+                    onChange={handleChange}
+                    className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="youraddress@gmail.com"
+                  />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-semibold text-orange-200">Snapchat</span>
+                  <input
+                    type="text"
+                    name="snapchat"
+                    value={userData.snapchat}
+                    onChange={handleChange}
+                    className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="Snapchat username"
+                  />
+                </label>
+                <label className="flex flex-col gap-2">
+                  <span className="text-sm font-semibold text-orange-200">Instagram</span>
+                  <input
+                    type="text"
+                    name="instagram"
+                    value={userData.instagram}
+                    onChange={handleChange}
+                    className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                    placeholder="Instagram handle"
                   />
                 </label>
               </div>

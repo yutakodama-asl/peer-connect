@@ -18,6 +18,13 @@ interface User {
   learnerSubjects?: string[];
   tutorBio?: string;
   learnerBio?: string;
+  availableDays?: string[]; // e.g. ["Monday", "Wednesday"]
+}
+// Helper: returns true if there is any overlap between viewerDays and userDays
+function hasDayOverlap(viewerDays: string[] = [], userDays: string[] = []) {
+  if (!Array.isArray(viewerDays) || !Array.isArray(userDays)) return false;
+  const viewerSet = new Set(viewerDays.map((d) => d.trim().toLowerCase()));
+  return userDays.some((d) => viewerSet.has(d.trim().toLowerCase()));
 }
 
 const normalizeSubjects = (subjects?: string[]) =>
@@ -140,6 +147,12 @@ export default function HomePage() {
         return false;
       }
       const tutorSubjects = getTutorSubjects(user);
+      // Availability matching: both must have availableDays, must overlap
+      const viewerDays = viewerProfile?.availableDays || [];
+      const userDays = user.availableDays || [];
+      if (viewerDays.length > 0 && userDays.length > 0 && !hasDayOverlap(viewerDays, userDays)) {
+        return false;
+      }
       if (tutorSubjects.length === 0) {
         return showAllTutors;
       }
@@ -151,7 +164,7 @@ export default function HomePage() {
         viewerLearnerSubjectSet.has(subject)
       );
     });
-  }, [users, currentUser, showAllTutors, hasViewerLearnerSubjects, viewerLearnerSubjectSet]);
+  }, [users, currentUser, showAllTutors, hasViewerLearnerSubjects, viewerLearnerSubjectSet, viewerProfile]);
 
   const learners = useMemo(() => {
     if (!currentUser) {
@@ -165,6 +178,12 @@ export default function HomePage() {
         return false;
       }
       const learnerSubjects = getLearnerSubjects(user);
+      // Availability matching: both must have availableDays, must overlap
+      const viewerDays = viewerProfile?.availableDays || [];
+      const userDays = user.availableDays || [];
+      if (viewerDays.length > 0 && userDays.length > 0 && !hasDayOverlap(viewerDays, userDays)) {
+        return false;
+      }
       if (learnerSubjects.length === 0) {
         return showAllLearners;
       }
@@ -176,7 +195,7 @@ export default function HomePage() {
         viewerTutorSubjectSet.has(subject)
       );
     });
-  }, [users, currentUser, showAllLearners, hasViewerTutorSubjects, viewerTutorSubjectSet]);
+  }, [users, currentUser, showAllLearners, hasViewerTutorSubjects, viewerTutorSubjectSet, viewerProfile]);
 
   const handleNavigate = (path: string) => {
     router.push(path);
@@ -283,6 +302,13 @@ export default function HomePage() {
                 tutors.map((user) => {
                   const tutorBio = getTutorBio(user);
                   const tutorSubjects = getTutorSubjects(user);
+                  const availableDays = user.availableDays || [];
+                  // Mailto link
+                  const subject = encodeURIComponent("Peer Connect - Tutoring Inquiry");
+                  const body = encodeURIComponent(
+                    `Hi ${user.name || "there"},\n\nI found your profile on Peer Connect and would like to connect about tutoring.\n\nThanks!\n`
+                  );
+                  const mailto = `mailto:${user.email}?subject=${subject}&body=${body}`;
 
                   return (
                     <article
@@ -295,6 +321,11 @@ export default function HomePage() {
                       <p className="mt-1 text-sm text-orange-200/80">
                         Grade {user.grade || "N/A"}
                       </p>
+                      {availableDays.length > 0 && (
+                        <p className="mt-1 text-xs text-orange-300">
+                          Available: {availableDays.join(", ")}
+                        </p>
+                      )}
                       {tutorBio && (
                         <p className="mt-3 text-sm italic text-orange-200/70">
                           “{tutorBio}”
@@ -312,9 +343,16 @@ export default function HomePage() {
                           ))}
                         </div>
                       )}
-                      <p className="mt-4 text-xs text-orange-300">
-                        {user.email}
-                      </p>
+                      <div className="mt-4 flex items-center gap-3">
+                        <p className="text-xs text-orange-300">{user.email}</p>
+                        <button
+                          type="button"
+                          onClick={() => handleNavigate(`/contact/${user.id}/`)}
+                          className="ml-2 rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-black shadow transition hover:bg-orange-400"
+                        >
+                          View Contact
+                        </button>
+                      </div>
                     </article>
                   );
                 })
@@ -368,6 +406,13 @@ export default function HomePage() {
                 learners.map((user) => {
                   const learnerBio = getLearnerBio(user);
                   const learnerSubjects = getLearnerSubjects(user);
+                  const availableDays = user.availableDays || [];
+                  // Mailto link
+                  const subject = encodeURIComponent("Peer Connect - Learning Inquiry");
+                  const body = encodeURIComponent(
+                    `Hi ${user.name || "there"},\n\nI found your profile on Peer Connect and would like to connect about learning support.\n\nThanks!\n`
+                  );
+                  const mailto = `mailto:${user.email}?subject=${subject}&body=${body}`;
 
                   return (
                     <article
@@ -380,6 +425,11 @@ export default function HomePage() {
                       <p className="mt-1 text-sm text-orange-200/80">
                         Grade {user.grade || "N/A"}
                       </p>
+                      {availableDays.length > 0 && (
+                        <p className="mt-1 text-xs text-orange-300">
+                          Available: {availableDays.join(", ")}
+                        </p>
+                      )}
                       {learnerBio && (
                         <p className="mt-3 text-sm italic text-orange-200/70">
                           “{learnerBio}”
@@ -397,9 +447,16 @@ export default function HomePage() {
                           ))}
                         </div>
                       )}
-                      <p className="mt-4 text-xs text-orange-300">
-                        {user.email}
-                      </p>
+                      <div className="mt-4 flex items-center gap-3">
+                        <p className="text-xs text-orange-300">{user.email}</p>
+                        <button
+                          type="button"
+                          onClick={() => handleNavigate(`/contact/${user.id}/`)}
+                          className="ml-2 rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-black shadow transition hover:bg-orange-400"
+                        >
+                          View Contact
+                        </button>
+                      </div>
                     </article>
                   );
                 })
