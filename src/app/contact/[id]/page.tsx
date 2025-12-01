@@ -4,17 +4,32 @@ import { useParams, useRouter } from "next/navigation";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../../lib/firebase";
 
+// Define the expected user profile type
+interface UserProfile {
+  name?: string;
+  grade?: string;
+  availableDays?: string[];
+  gmail?: string;
+  snapchat?: string;
+  instagram?: string;
+}
+
 export default function ContactPage() {
   const { id } = useParams();
-  const [profile, setProfile] = useState<any>(null);
   const router = useRouter();
+
+  const [profile, setProfile] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (!id) return;
+
     const fetchUser = async () => {
       const snap = await getDoc(doc(db, "users", id as string));
-      if (snap.exists()) setProfile(snap.data());
+      if (snap.exists()) {
+        setProfile(snap.data() as UserProfile);
+      }
     };
+
     fetchUser();
   }, [id]);
 
@@ -26,15 +41,18 @@ export default function ContactPage() {
     <div className="min-h-screen bg-black text-orange-200 p-10">
       <h1 className="text-3xl font-bold mb-4">{profile.name}</h1>
       <p className="mb-2">Grade: {profile.grade || "N/A"}</p>
-      <p className="mb-4">Available: {(profile.availableDays || []).join(", ")}</p>
+      <p className="mb-4">
+        Available: {(profile.availableDays || []).join(", ")}
+      </p>
 
       <h2 className="text-xl font-semibold mb-2">Contact Links</h2>
       <div className="flex flex-col gap-3 mt-3">
-
         {/* Gmail */}
         {profile.gmail && (
           <button
-            onClick={() => window.location.href = `mailto:${profile.gmail}`}
+            onClick={() =>
+              (window.location.href = `mailto:${profile.gmail}`)
+            }
             className="flex items-center gap-3 rounded-xl bg-orange-500/20 border border-orange-600 px-4 py-2 hover:bg-orange-500/30 transition text-left"
           >
             <span className="text-lg"></span>
@@ -76,7 +94,6 @@ export default function ContactPage() {
             </div>
           </a>
         )}
-
       </div>
 
       <button

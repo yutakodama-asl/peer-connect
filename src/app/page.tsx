@@ -18,9 +18,9 @@ interface User {
   learnerSubjects?: string[];
   tutorBio?: string;
   learnerBio?: string;
-  availableDays?: string[]; // e.g. ["Monday", "Wednesday"]
+  availableDays?: string[];
 }
-// Helper: returns true if there is any overlap between viewerDays and userDays
+
 function hasDayOverlap(viewerDays: string[] = [], userDays: string[] = []) {
   if (!Array.isArray(viewerDays) || !Array.isArray(userDays)) return false;
   const viewerSet = new Set(viewerDays.map((d) => d.trim().toLowerCase()));
@@ -34,47 +34,32 @@ const normalizeSubjects = (subjects?: string[]) =>
 
 const getTutorSubjects = (user: User): string[] => {
   const tutorSubjects = normalizeSubjects(user.tutorSubjects);
-  if (tutorSubjects.length > 0) {
-    return tutorSubjects;
-  }
+  if (tutorSubjects.length > 0) return tutorSubjects;
   const roleValue = user.role?.toLowerCase();
-  if (roleValue === "tutor" || roleValue === "both") {
-    return normalizeSubjects(user.subjects);
-  }
+  if (roleValue === "tutor" || roleValue === "both") return normalizeSubjects(user.subjects);
   return [];
 };
 
 const getLearnerSubjects = (user: User): string[] => {
   const learnerSubjects = normalizeSubjects(user.learnerSubjects);
-  if (learnerSubjects.length > 0) {
-    return learnerSubjects;
-  }
+  if (learnerSubjects.length > 0) return learnerSubjects;
   const roleValue = user.role?.toLowerCase();
-  if (!roleValue || roleValue === "learner" || roleValue === "both") {
+  if (!roleValue || roleValue === "learner" || roleValue === "both")
     return normalizeSubjects(user.subjects);
-  }
   return [];
 };
 
 const getTutorBio = (user: User): string | undefined => {
-  if (user.tutorBio && user.tutorBio.trim()) {
-    return user.tutorBio;
-  }
+  if (user.tutorBio && user.tutorBio.trim()) return user.tutorBio;
   const roleValue = user.role?.toLowerCase();
-  if (roleValue === "tutor" || roleValue === "both") {
-    return user.bio;
-  }
+  if (roleValue === "tutor" || roleValue === "both") return user.bio;
   return undefined;
 };
 
 const getLearnerBio = (user: User): string | undefined => {
-  if (user.learnerBio && user.learnerBio.trim()) {
-    return user.learnerBio;
-  }
+  if (user.learnerBio && user.learnerBio.trim()) return user.learnerBio;
   const roleValue = user.role?.toLowerCase();
-  if (!roleValue || roleValue === "learner" || roleValue === "both") {
-    return user.bio;
-  }
+  if (!roleValue || roleValue === "learner" || roleValue === "both") return user.bio;
   return undefined;
 };
 
@@ -85,13 +70,13 @@ export default function HomePage() {
   const [showAllTutors, setShowAllTutors] = useState(false);
   const [showAllLearners, setShowAllLearners] = useState(false);
   const [tab, setTab] = useState<"tutors" | "learners">("tutors");
+
   const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
     });
-
     return () => unsubscribe();
   }, []);
 
@@ -105,12 +90,11 @@ export default function HomePage() {
       setUsers(usersList);
       setLoading(false);
     };
-
     fetchUsers();
   }, []);
 
   const viewerProfile = useMemo(
-    () => (currentUser ? users.find((user) => user.id === currentUser.uid) ?? null : null),
+    () => (currentUser ? users.find((u) => u.id === currentUser.uid) ?? null : null),
     [users, currentUser]
   );
 
@@ -125,82 +109,51 @@ export default function HomePage() {
   );
 
   const viewerLearnerSubjectSet = useMemo(
-    () => new Set<string>(viewerLearnerSubjects.map((subject) => subject.toLowerCase())),
+    () => new Set(viewerLearnerSubjects.map((s) => s.toLowerCase())),
     [viewerLearnerSubjects]
   );
 
   const viewerTutorSubjectSet = useMemo(
-    () => new Set<string>(viewerTutorSubjects.map((subject) => subject.toLowerCase())),
+    () => new Set(viewerTutorSubjects.map((s) => s.toLowerCase())),
     [viewerTutorSubjects]
   );
 
   const hasViewerLearnerSubjects = viewerLearnerSubjects.length > 0;
   const hasViewerTutorSubjects = viewerTutorSubjects.length > 0;
+
   const tutors = useMemo(() => {
-    if (!currentUser) {
-      return [];
-    }
-    if (!showAllTutors && !hasViewerLearnerSubjects) {
-      return [];
-    }
+    if (!currentUser) return [];
+    if (!showAllTutors && !hasViewerLearnerSubjects) return [];
     return users.filter((user) => {
-      if (user.id === currentUser.uid) {
-        return false;
-      }
+      if (user.id === currentUser.uid) return false;
       const tutorSubjects = getTutorSubjects(user);
-      // Availability matching: both must have availableDays, must overlap
       const viewerDays = viewerProfile?.availableDays || [];
       const userDays = user.availableDays || [];
-      if (viewerDays.length > 0 && userDays.length > 0 && !hasDayOverlap(viewerDays, userDays)) {
+      if (viewerDays.length && userDays.length && !hasDayOverlap(viewerDays, userDays))
         return false;
-      }
-      if (tutorSubjects.length === 0) {
-        return showAllTutors;
-      }
-      if (showAllTutors) {
-        return true;
-      }
-      const tutorSubjectsLower = tutorSubjects.map((subject) => subject.toLowerCase());
-      return tutorSubjectsLower.some((subject) =>
-        viewerLearnerSubjectSet.has(subject)
-      );
+      if (tutorSubjects.length === 0) return showAllTutors;
+      if (showAllTutors) return true;
+      return tutorSubjects.some((s) => viewerLearnerSubjectSet.has(s.toLowerCase()));
     });
   }, [users, currentUser, showAllTutors, hasViewerLearnerSubjects, viewerLearnerSubjectSet, viewerProfile]);
 
   const learners = useMemo(() => {
-    if (!currentUser) {
-      return [];
-    }
-    if (!showAllLearners && !hasViewerTutorSubjects) {
-      return [];
-    }
+    if (!currentUser) return [];
+    if (!showAllLearners && !hasViewerTutorSubjects) return [];
     return users.filter((user) => {
-      if (user.id === currentUser.uid) {
-        return false;
-      }
+      if (user.id === currentUser.uid) return false;
       const learnerSubjects = getLearnerSubjects(user);
-      // Availability matching: both must have availableDays, must overlap
       const viewerDays = viewerProfile?.availableDays || [];
       const userDays = user.availableDays || [];
-      if (viewerDays.length > 0 && userDays.length > 0 && !hasDayOverlap(viewerDays, userDays)) {
+      if (viewerDays.length && userDays.length && !hasDayOverlap(viewerDays, userDays))
         return false;
-      }
-      if (learnerSubjects.length === 0) {
-        return showAllLearners;
-      }
-      if (showAllLearners) {
-        return true;
-      }
-      const learnerSubjectsLower = learnerSubjects.map((subject) => subject.toLowerCase());
-      return learnerSubjectsLower.some((subject) =>
-        viewerTutorSubjectSet.has(subject)
-      );
+      if (learnerSubjects.length === 0) return showAllLearners;
+      if (showAllLearners) return true;
+      return learnerSubjects.some((s) => viewerTutorSubjectSet.has(s.toLowerCase()));
     });
   }, [users, currentUser, showAllLearners, hasViewerTutorSubjects, viewerTutorSubjectSet, viewerProfile]);
 
-  const handleNavigate = (path: string) => {
-    router.push(path);
-  };
+  const handleNavigate = (path: string) => router.push(path);
 
   const handleSignOut = async () => {
     try {
@@ -220,6 +173,12 @@ export default function HomePage() {
       </div>
     );
   }
+
+  useEffect(() => {
+  if (!loading && !currentUser) {
+    router.push("/signin");
+  }
+}, [loading, currentUser, router]);
 
   return (
     <div className="min-h-screen bg-black text-orange-100">
