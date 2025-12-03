@@ -66,6 +66,7 @@ const getLearnerBio = (user: User): string | undefined => {
 export default function HomePage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
   const [currentUser, setCurrentUser] = useState<FirebaseAuthUser | null>(null);
   const [showAllTutors, setShowAllTutors] = useState(false);
   const [showAllLearners, setShowAllLearners] = useState(false);
@@ -76,6 +77,7 @@ export default function HomePage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
+      setAuthChecked(true);
     });
     return () => unsubscribe();
   }, []);
@@ -92,6 +94,12 @@ export default function HomePage() {
     };
     fetchUsers();
   }, []);
+
+  useEffect(() => {
+    if (authChecked && !currentUser) {
+      router.push("/signin");
+    }
+  }, [authChecked, currentUser, router]);
 
   const viewerProfile = useMemo(
     () => (currentUser ? users.find((u) => u.id === currentUser.uid) ?? null : null),
@@ -166,6 +174,14 @@ export default function HomePage() {
     }
   };
 
+  if (!authChecked) {
+    return (
+      <div className="flex justify-center items-center min-h-screen bg-black text-orange-500">
+        Checking authentication...
+      </div>
+    );
+  }
+
   if (loading) {
     return (
       <div className="flex justify-center items-center min-h-screen bg-black text-orange-500">
@@ -173,12 +189,6 @@ export default function HomePage() {
       </div>
     );
   }
-
-  useEffect(() => {
-  if (!loading && !currentUser) {
-    router.push("/signin");
-  }
-}, [loading, currentUser, router]);
 
   return (
     <div className="min-h-screen bg-black text-orange-100">
