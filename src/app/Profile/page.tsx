@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { db, auth } from "../lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut, type User as FirebaseUser } from "firebase/auth";
+import { ThemeToggle } from "../components/ThemeToggle";
+import { useTheme } from "../lib/theme";
 import {
   filterCatalog,
   sortSubjects,
@@ -37,8 +39,6 @@ const ProfilePage = () => {
     learnerBio: "",
     availableDays: [] as string[],
     gmail: "",
-    snapchat: "",
-    instagram: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -48,6 +48,8 @@ const ProfilePage = () => {
 
   const router = useRouter();
   const [authUser, setAuthUser] = useState<FirebaseUser | null>(() => auth.currentUser);
+  const { theme } = useTheme();
+  const isLight = theme === "light";
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -115,8 +117,6 @@ const ProfilePage = () => {
               ? data.availableDays.filter((d: unknown) => typeof d === "string")
               : [],
             gmail: typeof data.gmail === "string" ? data.gmail : "",
-            snapchat: typeof data.snapchat === "string" ? data.snapchat : "",
-            instagram: typeof data.instagram === "string" ? data.instagram : "",
           });
 
         } else {
@@ -232,8 +232,6 @@ const ProfilePage = () => {
         bio: tutorBio || learnerBio,
         availableDays: userData.availableDays,
         gmail: userData.gmail?.trim() || "",
-        snapchat: userData.snapchat?.trim() || "",
-        instagram: userData.instagram?.trim() || "",
       }, { merge: true });
       router.push("/");
     } catch (e) {
@@ -271,41 +269,51 @@ const ProfilePage = () => {
     }
   };
 
+  const shellStyle = { background: "var(--background)" };
+  const textBase = isLight ? "text-amber-900" : "text-orange-100";
+  const headerClass = `border-b backdrop-blur ${
+    isLight ? "border-orange-200/70 bg-white/70" : "border-orange-500/25 bg-black/70"
+  }`;
+  const navButtonClass = `rounded-full border px-4 py-1 text-sm font-semibold transition ${
+    isLight
+      ? "border-orange-200 text-amber-900 bg-white/70 hover:border-orange-400 hover:text-orange-900 shadow-sm"
+      : "border-orange-500/35 text-orange-100 bg-black/60 hover:border-orange-300 hover:text-white shadow-sm"
+  }`;
+  const primaryButtonClass = isLight
+    ? "rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-4 py-1 text-sm font-semibold text-white shadow-md transition hover:shadow-lg"
+    : "rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-4 py-1 text-sm font-semibold text-black shadow-md transition hover:shadow-lg";
+  const surfaceClass = "rounded-3xl border app-surface shadow-[0_25px_70px_-30px_rgba(249,115,22,0.35)]";
+  const surfaceSoft = "rounded-2xl border app-surface-soft";
+  const inputClass = `w-full rounded-xl border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+    isLight ? "border-orange-200 bg-white/90 text-amber-900" : "border-orange-600 bg-black text-orange-200"
+  }`;
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-black via-gray-950 to-gray-900 text-orange-100">
-      <header className="border-b border-orange-700/40 bg-black/70 backdrop-blur">
+    <div className={`min-h-screen ${textBase}`} style={shellStyle}>
+      <header className={headerClass}>
         <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-6 py-5">
           <button
             onClick={() => handleNavigate("/")}
-            className="text-left text-2xl font-bold tracking-tight text-orange-400 transition hover:text-orange-300"
+            className={`text-left text-2xl font-bold tracking-tight transition hover:opacity-80 ${
+              isLight ? "text-slate-900" : "text-orange-100"
+            }`}
           >
             Peer Connect
           </button>
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => handleNavigate("/")}
-              className="rounded-full border border-orange-600/60 px-4 py-1 text-sm font-medium text-orange-200 transition hover:border-orange-400 hover:text-orange-100"
-            >
+            <ThemeToggle />
+            <button onClick={() => handleNavigate("/")} className={navButtonClass}>
               Home
             </button>
-            <button
-              onClick={() => handleNavigate("/Profile")}
-              className="rounded-full border border-orange-600/60 px-4 py-1 text-sm font-medium text-orange-200 transition hover:border-orange-400 hover:text-orange-100"
-            >
+            <button onClick={() => handleNavigate("/Profile")} className={navButtonClass}>
               Profile
             </button>
             {!authUser ? (
-              <button
-                onClick={() => handleNavigate("/signin")}
-                className="rounded-full bg-orange-500 px-4 py-1 text-sm font-semibold text-black shadow-lg transition hover:bg-orange-400"
-              >
+              <button onClick={() => handleNavigate("/signin")} className={primaryButtonClass}>
                 Sign In
               </button>
             ) : (
-              <button
-                onClick={handleSignOut}
-                className="rounded-full bg-orange-600 px-4 py-1 text-sm font-semibold text-black shadow-lg transition hover:bg-orange-500"
-              >
+              <button onClick={handleSignOut} className={primaryButtonClass}>
                 Sign Out
               </button>
             )}
@@ -315,77 +323,75 @@ const ProfilePage = () => {
 
       <main className="mx-auto max-w-5xl px-6 py-12">
         {!authUser ? (
-          <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-10 text-center shadow-[0_25px_70px_-30px_rgba(250,115,22,0.45)]">
-            <h1 className="text-3xl font-semibold text-orange-200">
+          <section className={`${surfaceClass} p-10 text-center`}>
+            <h1 className="text-3xl font-semibold">
               Sign in to keep your profile up to date
             </h1>
-            <p className="mt-3 text-sm text-orange-200/70">
+            <p className={`mt-3 text-sm ${isLight ? "text-amber-800" : "text-orange-200/80"}`}>
               Jump back into the directory by using your school email.
             </p>
             <div className="mt-8 flex justify-center">
               <button
                 onClick={() => handleNavigate("/signin")}
-                className="rounded-full bg-orange-500 px-6 py-3 text-sm font-semibold text-black shadow-lg transition hover:bg-orange-400"
+                className={primaryButtonClass.replace("px-4 py-1", "px-6 py-3")}
               >
                 Go to sign in
               </button>
             </div>
           </section>
         ) : loading ? (
-          <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-10 text-center shadow-[0_25px_70px_-30px_rgba(250,115,22,0.45)]">
-            <h1 className="text-3xl font-semibold text-orange-200">
+          <section className={`${surfaceClass} p-10 text-center`}>
+            <h1 className="text-3xl font-semibold">
               Loading your profile
             </h1>
-            <p className="mt-3 text-sm text-orange-200/70">
+            <p className={`mt-3 text-sm ${isLight ? "text-amber-800" : "text-orange-200/80"}`}>
               We&apos;re fetching your saved details. This only takes a moment.
             </p>
           </section>
         ) : (
-          <section className="rounded-3xl border border-orange-700/50 bg-black/60 p-10 shadow-[0_25px_70px_-30px_rgba(250,115,22,0.45)]">
-            <div className="flex flex-col gap-4 border-b border-orange-700/40 pb-6">
-              <h1 className="text-4xl font-bold text-orange-200">Your Profile</h1>
-              <p className="max-w-2xl text-sm text-orange-200/70">
+          <section className={`${surfaceClass} p-10`}>
+            <div className="flex flex-col gap-4 border-b border-orange-500/30 pb-6">
+              <h1 className="text-4xl font-bold">Your Profile</h1>
+              <p className={`max-w-2xl text-sm ${isLight ? "text-amber-800" : "text-orange-200/80"}`}>
                 Share a quick snapshot of who you are so tutors and learners can find the perfect match.
               </p>
             </div>
 
             {error && (
-              <p className="mt-4 rounded-lg border border-red-500/40 bg-red-950/60 px-4 py-2 text-sm text-red-300">
+              <p className={`mt-4 rounded-lg border px-4 py-2 text-sm ${isLight ? "border-red-200 bg-red-50 text-red-700" : "border-red-500/40 bg-red-950/60 text-red-300"}`}>
                 {error}
               </p>
             )}
 
             <div className="mt-6 grid gap-5 md:grid-cols-2">
               <label className="flex flex-col gap-2">
-                <span className="text-sm font-semibold text-orange-200">Name</span>
-                <input
-                  type="text"
-                  name="name"
-                  value={userData.name}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="Your full name"
-                />
+                <span className="text-sm font-semibold">Full name</span>
+                <input type="text" name="name" value={userData.name} onChange={handleChange} className={inputClass} placeholder="Your full name" />
               </label>
 
               <label className="flex flex-col gap-2">
-                <span className="text-sm font-semibold text-orange-200">Grade</span>
-                <input
-                  type="text"
+                <span className="text-sm font-semibold">Grade</span>
+                <select
                   name="grade"
                   value={userData.grade}
-                  onChange={handleChange}
-                  className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                  placeholder="e.g. 10th, 11th"
-                />
+                  onChange={handleChange as unknown as React.ChangeEventHandler<HTMLSelectElement>}
+                  className={inputClass}
+                >
+                  <option value="">Select grade</option>
+                  <option value="9">9</option>
+                  <option value="10">10</option>
+                  <option value="11">11</option>
+                  <option value="12">12</option>
+                  <option value="Other">Other</option>
+                </select>
               </label>
             </div>
 
             <div className="mt-8 grid gap-6 md:grid-cols-2">
-              <div className="flex h-full flex-col gap-4 rounded-2xl border border-orange-700/40 bg-gray-950/40 p-5">
+              <div className={`flex h-full flex-col gap-4 ${surfaceSoft} p-5`}>
                 <div>
-                  <h2 className="text-xl font-semibold text-orange-200">Tutor Profile</h2>
-                  <p className="mt-1 text-xs text-orange-200/70">
+                  <h2 className="text-xl font-semibold">Tutor Profile</h2>
+                  <p className={`mt-1 text-xs ${isLight ? "text-amber-800" : "text-orange-200/80"}`}>
                     Share what you can teach classmates who need a boost.
                   </p>
                 </div>
@@ -395,7 +401,9 @@ const ProfilePage = () => {
                       userData.tutorSubjects.map((subject) => (
                         <span
                           key={subject}
-                          className="group inline-flex items-center gap-2 rounded-full border border-orange-500/40 bg-orange-500/20 px-3 py-1 text-xs font-medium text-orange-100"
+                          className={`group inline-flex items-center gap-2 rounded-full border border-orange-500/40 bg-orange-500/20 px-3 py-1 text-xs font-medium ${
+                            isLight ? "text-amber-900" : "text-orange-100"
+                          }`}
                         >
                           {subject}
                           <button
@@ -486,7 +494,9 @@ const ProfilePage = () => {
                       userData.learnerSubjects.map((subject) => (
                         <span
                           key={subject}
-                          className="group inline-flex items-center gap-2 rounded-full border border-orange-500/40 bg-orange-500/20 px-3 py-1 text-xs font-medium text-orange-100"
+                          className={`group inline-flex items-center gap-2 rounded-full border border-orange-500/40 bg-orange-500/20 px-3 py-1 text-xs font-medium ${
+                            isLight ? "text-amber-900" : "text-orange-100"
+                          }`}
                         >
                           {subject}
                           <button
@@ -591,8 +601,8 @@ const ProfilePage = () => {
             {/* Contact Information */}
             <div className="mt-8 rounded-2xl border border-orange-700/40 bg-gray-950/40 p-5">
               <h2 className="text-xl font-semibold text-orange-200 mb-2">Contact Information</h2>
-              <div className="grid gap-5 md:grid-cols-3">
-                <label className="flex flex-col gap-2">
+              <div className="grid gap-5 md:grid-cols-2">
+                <label className="flex flex-col gap-2 md:col-span-1">
                   <span className="text-sm font-semibold text-orange-200">Gmail</span>
                   <input
                     type="email"
@@ -601,28 +611,6 @@ const ProfilePage = () => {
                     onChange={handleChange}
                     className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
                     placeholder="youraddress@gmail.com"
-                  />
-                </label>
-                <label className="flex flex-col gap-2">
-                  <span className="text-sm font-semibold text-orange-200">Snapchat</span>
-                  <input
-                    type="text"
-                    name="snapchat"
-                    value={userData.snapchat}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Snapchat username"
-                  />
-                </label>
-                <label className="flex flex-col gap-2">
-                  <span className="text-sm font-semibold text-orange-200">Instagram</span>
-                  <input
-                    type="text"
-                    name="instagram"
-                    value={userData.instagram}
-                    onChange={handleChange}
-                    className="w-full rounded-xl border border-orange-600 bg-black px-3 py-2 text-orange-200 focus:outline-none focus:ring-2 focus:ring-orange-500"
-                    placeholder="Instagram handle"
                   />
                 </label>
               </div>

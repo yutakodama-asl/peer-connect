@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: radial-gradient(circle at 20% 20%, #fff4e6 0%, #ffe8d5 40%, #ffe0bf 70%, #fff7ed 100%);
+  --foreground: #2d1605;
+  --panel: rgba(255, 255, 255, 0.9);
+  --panel-soft: rgba(255, 245, 235, 0.82);
+  --border-strong: rgba(249, 115, 22, 0.35);
+  --border-soft: rgba(249, 115, 22, 0.18);
+  --chip-bg: #fff1e6;
+  --chip-border: rgba(251, 146, 60, 0.45);
+  --chip-text: #2d1605;
+  --muted: #6b3a11;
 }
 
 @theme inline {
@@ -12,15 +20,80 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body.theme-dark {
+  --background: radial-gradient(circle at 25% 20%, #0b0805 0%, #140a06 35%, #1f0f07 70%, #0a0503 100%);
+  --foreground: #ffeada;
+  --panel: rgba(17, 10, 6, 0.9);
+  --panel-soft: rgba(24, 14, 9, 0.7);
+  --border-strong: rgba(249, 115, 22, 0.4);
+  --border-soft: rgba(249, 115, 22, 0.2);
+  --chip-bg: rgba(249, 115, 22, 0.14);
+  --chip-border: rgba(249, 115, 22, 0.35);
+  --chip-text: #ffedd5;
+  --muted: #f7cbaa;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition: background 0.4s ease, color 0.25s ease;
+  min-height: 100vh;
+}
+
+.app-surface {
+  background: var(--panel);
+  border-color: var(--border-strong);
+}
+
+.app-surface-soft {
+  background: var(--panel-soft);
+  border-color: var(--border-soft);
+}
+
+.app-chip {
+  background: var(--chip-bg);
+  border-color: var(--chip-border);
+  color: var(--chip-text);
+}
+
+.app-muted {
+  color: var(--muted);
+}
+
+/* Light-mode helpers to keep older dark surfaces readable */
+body.theme-light [class*="bg-black"] {
+  background-color: var(--panel) !important;
+  color: var(--foreground);
+}
+
+body.theme-light [class*="bg-gray-95"],
+body.theme-light [class*="bg-gray-90"] {
+  background-color: var(--panel) !important;
+  color: var(--foreground);
+}
+
+body.theme-light [class*="text-orange-200"],
+body.theme-light [class*="text-orange-300"] {
+  color: var(--foreground) !important;
+}
+
+.app-surface {
+  background: var(--panel);
+  border-color: var(--border-strong);
+}
+
+.app-surface-soft {
+  background: var(--panel-soft);
+  border-color: var(--border-soft);
+}
+
+.app-chip {
+  background: var(--chip-bg);
+  border-color: var(--chip-border);
+  color: var(--chip-text);
+}
+
+.app-muted {
+  color: var(--muted);
 }
